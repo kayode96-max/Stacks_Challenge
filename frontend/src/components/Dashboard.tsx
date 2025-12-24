@@ -1,13 +1,50 @@
 import { useAppKitAccount } from '@reown/appkit/react'
 import { useBuilderTracker } from '../hooks/useBuilderTracker'
 import { formatEther, parseEther } from 'ethers'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { GitHubLink } from './GitHubLink'
+import { Achievements } from './Achievements'
+import { ActivityTimeline } from './ActivityTimeline'
+import { useToast } from './Toast'
 
 export function Dashboard() {
-  const { isConnected } = useAppKitAccount()
+  const { isConnected, address } = useAppKitAccount()
   const { stats, loading, registerBuilder, addUser, collectFee } = useBuilderTracker()
   const [userAddress, setUserAddress] = useState('')
   const [feeAmount, setFeeAmount] = useState('')
+  const [githubLinked, setGithubLinked] = useState(false)
+  const [githubContributions, setGithubContributions] = useState(0)
+  const [walletConnections, setWalletConnections] = useState(0)
+  const { showToast } = useToast()
+
+  // Track wallet connection
+  useEffect(() => {
+    if (address && isConnected) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      fetch(`${apiUrl}/api/wallet/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      })
+        .then(res => res.json())
+        .then(data => setWalletConnections(data.connections))
+        .catch(console.error)
+    }
+  }, [address, isConnected])
+
+  // Fetch GitHub contributions if linked
+  useEffect(() => {
+    if (address && githubLinked) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      fetch(`${apiUrl}/api/github/${address}`)
+        .then(res => res.json())
+        .then(() => {
+          // Contributions will be fetched from the leaderboard endpoint
+          setGithubContributions(0) // Placeholder
+        })
+        .catch(() => setGithubLinked(false))
+    }
+  }, [address, githubLinked])
 
   if (!isConnected) {
     return (
@@ -44,8 +81,10 @@ export function Dashboard() {
     try {
       await addUser(userAddress)
       setUserAddress('')
+      showToast({ message: 'User added successfully!', type: 'success' })
     } catch (error) {
       console.error(error)
+      showToast({ message: 'Failed to add user', type: 'error' })
     }
   }
 
@@ -55,9 +94,16 @@ export function Dashboard() {
     try {
       await collectFee(parseEther(feeAmount).toString())
       setFeeAmount('')
+      showToast({ message: `Fee of ${feeAmount} ETH collected!`, type: 'success' })
     } catch (error) {
       console.error(error)
+      showToast({ message: 'Failed to collect fee', type: 'error' })
     }
+  }
+
+  const handleGitHubLinked = (username: string) => {
+    setGithubLinked(true)
+    showToast({ message: `GitHub account @${username} linked!`, type: 'success' })
   }
 
   return (
@@ -117,6 +163,19 @@ export function Dashboard() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
             />
             <button
+
+      {/* GitHub Integration */}
+      <GitHubLink onLinked={handleGitHubLinked} />
+
+      {/* Achievements */}
+      <Achievements 
+        stats={{
+          totalUsers: stats?.totalUsers || 0,
+          totalFees: BigInt(stats?.totalFees || '0'),
+          githubContributions,
+          walletKitUsage: walletConnections
+        }}
+      />
               type="submit"
               disabled={loading || !feeAmount}
               className="w-full px-4 py-2 bg-secondary hover:bg-secondary-dark text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
