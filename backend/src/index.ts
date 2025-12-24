@@ -30,6 +30,11 @@ interface LeaderboardEntry {
   totalScore: number
 }
 
+// In-memory storage for GitHub username mappings and wallet connections
+// In production, use a database
+const githubMappings: Map<string, string> = new Map() // address -> username
+const walletConnections: Map<string, number> = new Map() // address -> connection count
+
 // Calculate score based on different metrics
 function calculateScore(users: number, fees: string, github: number, walletKit: number): number {
   const feeScore = parseFloat(ethers.formatEther(fees)) * 100
@@ -56,11 +61,15 @@ async function getGitHubContributions(username: string): Promise<number> {
   }
 }
 
-// Mock function to track WalletKit usage
-// In production, this would integrate with WalletKit analytics
+// Track WalletKit usage
 function getWalletKitUsage(address: string): number {
-  // Mock data - replace with actual WalletKit SDK tracking
-  return Math.floor(Math.random() * 50)
+  return walletConnections.get(address.toLowerCase()) || 0
+}
+
+function incrementWalletConnection(address: string): void {
+  const lowerAddress = address.toLowerCase()
+  const current = walletConnections.get(lowerAddress) || 0
+  walletConnections.set(lowerAddress, current + 1)
 }
 
 // API Routes
@@ -88,9 +97,9 @@ app.get('/api/leaderboard', async (req: Request, res: Response) => {
     const leaderboardPromises = builders.map(async (address: string) => {
       const stats = await contract.getBuilderStats(address)
       
-      // Mock GitHub username mapping - in production, store this mapping
-      const mockGitHubUsername = `builder${address.slice(-4)}`
-      const githubContributions = await getGitHubContributions(mockGitHubUsername)
+      // Get GitHub username from mapping
+      const githubUsername = githubMappings.get(address.toLowerCase())
+      const githubContributions = githubUsername ? await getGitHubContributions(githubUsername) : 0
       const walletKitUsage = getWalletKitUsage(address)
       
       const entry: LeaderboardEntry = {
@@ -148,6 +157,85 @@ app.get('/api/builder/:address', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching builder stats:', error)
     res.status(500).json({ error: 'Failed to fetch builder stats' })
+  }
+})
+
+// Link GitHub account
+app.post('/api/github/link', (req: Request, res: Response) => {
+  try {
+    const { address, username } = req.body
+
+    if (!address || !username) {
+      return res.status(400).json({ error: 'Address and username required' })
+    }
+
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid address' })
+    }
+
+    githubMappings.set(address.toLowerCase(), username)
+    res.json({ success: true, address, username })
+  } catch (error) {
+    console.error('Error linking GitHub:', error)
+    res.status(500).json({ error: 'Failed to link GitHub account' })
+  }
+})
+
+// Get GitHub username for address
+app.get('/api/github/:address', (req: Request, res: Response) => {
+  try {
+    const { address } = req.params
+
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid address' })
+    }
+
+    const username = githubMappings.get(address.toLowerCase())
+    
+    if (!username) {
+      return res.status(404).json({ error: 'No GitHub account linked' })
+    }
+
+    res.json({ address, username })
+  } catch (error) {
+    console.error('Error fetching GitHub username:', error)
+    res.status(500).json({ error: 'Failed to fetch GitHub username' })
+  }
+})
+
+// Track wallet connection
+app.post('/api/wallet/connect', (req: Request, res: Response) => {
+  try {
+    const { address } = req.body
+
+    if (!address || !ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid address' })
+    }
+
+    incrementWalletConnection(address)
+    const count = getWalletKitUsage(address)
+    
+    res.json({ success: true, address, connections: count })
+  } catch (error) {
+    console.error('Error tracking wallet connection:', error)
+    res.status(500).json({ error: 'Failed to track connection' })
+  }
+})
+
+// Get wallet connection count
+app.get('/api/wallet/:address', (req: Request, res: Response) => {
+  try {
+    const { address } = req.params
+
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid address' })
+    }
+
+    const connections = getWalletKitUsage(address)
+    res.json({ address, connections })
+  } catch (error) {
+    console.error('Error fetching wallet stats:', error)
+    res.status(500).json({ error: 'Failed to fetch wallet stats' })
   }
 })
 
