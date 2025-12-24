@@ -37,8 +37,9 @@ export function useBuilderTracker() {
     setLoading(true)
     try {
       const tx = await contract.registerBuilder()
-      await tx.wait()
+      const receipt = await tx.wait()
       await fetchStats()
+      return receipt
     } catch (error) {
       console.error('Error registering builder:', error)
       throw error
@@ -52,8 +53,9 @@ export function useBuilderTracker() {
     setLoading(true)
     try {
       const tx = await contract.addUser(userAddress)
-      await tx.wait()
+      const receipt = await tx.wait()
       await fetchStats()
+      return receipt
     } catch (error) {
       console.error('Error adding user:', error)
       throw error
@@ -67,8 +69,9 @@ export function useBuilderTracker() {
     setLoading(true)
     try {
       const tx = await contract.collectFee({ value: amount })
-      await tx.wait()
+      const receipt = await tx.wait()
       await fetchStats()
+      return receipt
     } catch (error) {
       console.error('Error collecting fee:', error)
       throw error
