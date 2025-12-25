@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BuilderTracker } from "../typechain-types";
-import { SignerWithAddress } from "@nomicfoundation/hardhat-toolbox/signers";
+import { HardhatEthersSigner as SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("BuilderTracker", function () {
   let builderTracker: BuilderTracker;
