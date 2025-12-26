@@ -45,14 +45,13 @@ export function OnchainActivity() {
       addTransaction('Register', 'pending', 'Registering as builder...')
       setTransactionStatus('⏳ Registering... Confirm in your wallet')
 
-      const receipt = await registerBuilder()
+      await registerBuilder()
       
       addTransaction('Register', 'success', 'Registered successfully!')
       setTransactionStatus('✅ You are now registered as a builder!')
       
       // Transaction details
       console.log('Registration TX:', {
-        hash: receipt?.hash,
         from: address,
         action: 'registerBuilder',
         timestamp: new Date().toISOString()
